@@ -1,0 +1,359 @@
+  #include<SD.h>
+  #include<SPI.h>
+  #include<Keypad.h>
+  #include <stdlib.h>
+  #include<virtuabotixRTC.h>
+  File dosyam;
+  int kullanici=-1;int sayac=0;int i=0;int kimlik;int sure;
+  int counter=0;int durum;
+  char keypressed="",kapi="";
+  int kontrol;
+
+  
+    /////////////////////////////////////////////////////////   
+
+
+
+
+                                                                    // keypad konfigürasyon bölümü
+int control = 0;
+const byte numRows= 4;
+const byte numCols= 4;
+String enter_password;     // girilen şifreyi tutar
+String password = ""; // kendimizin belirlediği şifre 
+// keypad tuş yapısını oluşturuyoruz
+char keymap[numRows][numCols]= 
+{
+{'1', '2', '3', 'A'}, 
+{'4', '5', '6', 'B'}, 
+{'7', '8', '9', 'C'},
+{'*', '0', '#', 'D'}
+}; 
+
+// bağlantı bacaklarını belirliyoruz
+byte rowPins[numRows] = {3,10,2,5}; 
+byte colPins[numCols]= {6,7,8,9};
+  
+// keypad i set ediyoruz
+Keypad myKeypad= Keypad(makeKeymap(keymap), rowPins, colPins, numRows, numCols); 
+
+//
+
+//saat objesi tanımlıyoruz
+//SCLK -> pin1, I/O ->pin2, CE -> pin3
+virtuabotixRTC myRTC(A1, A2, A3);
+
+
+
+    ////////////////////////
+
+
+
+
+
+
+    
+      void setup() {
+        
+      Serial.begin(9600);
+   myRTC.setDS1302Time(00, 30, 9,7, 14, 8, 2018);                                               //başlangıç tarihi  
+   
+       pinMode(A1, INPUT);                                                                       // analog girişleri 
+      pinMode(A2, INPUT);                                                                       //  digital olarak kullanma 
+      pinMode(A3, INPUT);
+      //pinMode(A4,OUTPUT);
+      
+       while(!SD.begin(4))                                                                //sd kart takılı olma kontrolü
+        {
+        Serial.println("Hafıza kartı bekleniyor..");
+        delay(1000);
+        if(SD.begin(4))
+        {
+          break;
+        }
+        }
+        Serial.println("Kart hazır.");                                                    //sd kart...
+        
+      }
+
+      ////////////////////////////////////////////////////
+      
+  int key()
+  {
+ keypressed = myKeypad.getKey();  // keypadden gelen değer
+ 
+  if (keypressed != NO_KEY) {
+    Serial.print(keypressed);
+    control = 1;                                                            //eğer keypadden değer girilirse akışı başlatmak için control 1 yapılır.
+      
+    if(control == 1){
+      enter_password = enter_password + keypressed;
+      counter++;
+      delay(500);
+      Serial.println("sifre " + enter_password );
+      delay(1000);
+      // password doğru ise
+      if(counter<3){
+        password=enter_password;
+                                                                  //kullanıcı id alınıyor ilk 2 girişte 
+        
+       }
+      if(counter>2) {                                               //3. girişte  açılacak kapi no alınıyor
+         kapi=keypressed;
+        Serial.println(kapi);
+         Serial.println(password);
+        Serial.print("kapı açıldı");
+        Serial.println(enter_password);
+        String donen=password;
+         enter_password="";
+         keypressed="";
+         counter = 0;
+         return donen.toInt();
+        
+        control = 0;                         // diğer giriş için değişkenleri sıfırlama  (daha yapamadım)
+        
+        //
+        delay(1000);
+       
+      
+       
+        
+      }
+      // password yanlış veya 4 den fazla girildi ise
+      else if ((enter_password != password) && (counter > 4) ) {
+        Serial.print("hatalı giriş");
+       delay(3000);
+       
+        enter_password = "";
+        control = 0;
+        counter = 0;
+      }
+    }
+  
+  
+  }
+}
+
+
+
+
+                            
+////////////////////////////
+
+
+
+
+    void loop() {
+     
+     dosyam = SD.open("giris.txt" , FILE_READ);
+///////////////////
+
+    kullanici=0;
+    //keypressed="";
+    //enter_password="";
+
+       kullanici=key();   // tuş hassayetinden dolayı stabil çalışmıyor
+  Serial.write(kullanici);
+  Serial.println("*****");
+ Serial.println(kullanici);                    //butondan gelen veri kontrol amaçlı değişken
+ Serial.println("*****");
+if(kullanici<100 && kullanici>0)
+{
+  bul(kullanici);                               //butondan gelen id yi ara functionuna yolluyoruz
+}
+ Serial.println("loop bitti..");
+                               //butondan gelen id yi ara functionuna yolluyoruz
+/*
+delay(3000);
+Serial.print(sayac);Serial.println(" -enes");
+sayac=0;
+Serial.print(sayac);Serial.println(" -süre doldu");
+*/
+Serial.println("10 sn bekleniyor...");
+
+
+
+        dosyam.close();
+    }
+
+
+
+
+    
+         /////////////////////////////////////////////////////
+
+
+
+
+
+
+
+int bul(int kullanici)
+{ 
+  char ad[20];
+  char kayit[300];
+  char okunan[300];
+  char kisi[2];
+   Serial.print("  ****** kulll: ");                                                      //şuan girilen id  olarak kullanılıyor
+  Serial.println(kullanici);Serial.print("  kulll******");
+  dosyam.seek(i);                                           //imleç konum 
+  //Serial.println(dosyam.position());
+  //Serial.print(i);
+  Serial.println("-------veriler okunuyor------");
+  
+  while (i<dosyam.size()&&sayac<250)
+   {
+    
+    dosyam.peek();
+    okunan[i] = dosyam.read();                                                            // karakterler tek tek dizi değişkene sırayla aktarılıyor
+      Serial.println(okunan[i]);
+      kayit[sayac]=okunan[i];                                                             //okunan her karakteri diziye kaydet
+      sayac++;
+      
+      if(kayit[sayac]='$'&&sayac>7)                                                               //satır sonuna geldiğine belirtilen noktayadaki 
+      {                                                                                           // id yi alır kimlik olarak atanır.
+        kisi[0]=kayit[sayac-14];
+      
+      kisi[1]=kayit[sayac-13];
+      kimlik=atoi(kisi);
+      
+      // Serial.println("kisi: "+kimlik);
+       //Serial.println(dosyam.position()); //çalışma kontrol
+       /*  if(kisi==88)                                                                                                //kullanicidan gelen id kayıtlıysa giriş sağlandı yazar.
+        {  while (i<dosyam.size())
+          {dosyam.peek();
+    okunan[i] = dosyam.read();
+          Serial.println(okunan[i]);}
+        } 
+        */
+                                                                                  //12.08.18 
+                                                                                                         //kullanıcı giriş yaptığında log.txt den değerini 0 ise 1 yapar
+      if(kimlik==kullanici)
+      {
+        Serial.print("değer: ");Serial.println(kayit[sayac-2]);
+        /*  //led uyarı çalışıyor 30.08.18
+                                              if(kapi=='A')
+                                              {yak();}
+                                              if(kapi=='B')
+                                              {yak();yak();}
+                                              if(kapi=='C')
+                                              {yak();yak();yak();}
+                                              if(kapi=='D')
+                                              {yak();yak();yak();yak();}
+                                              
+                              */         
+      
+      int say=0;                          // eşlenen kişinin adını alıyorum.
+      say=sayac-11;
+      for(int k=0;k<8;k++)
+             {ad[k]=kayit[say];
+              Serial.println(ad[k]);say++;
+             }
+
+             
+        Serial.print("  ******");Serial.println(kayit[sayac-2]);    Serial.print("  ******");
+
+        
+      if(kayit[sayac-2]=='0')                                            //kişinin log bilgisi "0" ise  "1"  yaparız
+                                                                          // dosya normalde istenilen yere 1 yada 0 yazıyordu bi bug oluştu ve başka teknik deneyeceğim. 31.08.18
+      {
+       durum=1;
+       dosyam.close();        
+       dosyam=SD.open("giris.txt",FILE_WRITE);
+       Serial.println(dosyam.peek());
+       dosyam.seek(sayac-2);
+       dosyam.peek();
+       dosyam.print("1");
+       delay(3000);
+       Serial.println("giris.txt değiştirildi..1..");
+       Serial.print("  ******değiştimi :"); Serial.print(kayit[sayac-2]);         Serial.println("  ******");
+       dosyam.close();
+       yak();    
+      }
+      if(kayit[sayac-2]=='3')
+      {
+        durum=0;
+        dosyam.close();
+        dosyam=SD.open("giris.txt",FILE_WRITE);
+        dosyam.seek(sayac-2);
+        dosyam.peek();
+        Serial.print("  ******"); Serial.print(dosyam.position());         Serial.print("  ******");
+        dosyam.print("0");
+        delay(3000);
+        Serial.println("giris.txt değiştirildi.0...");
+        Serial.print("  ******değiştimi :"); Serial.print(kayit[sayac-2]);         Serial.println("  ******");
+       
+        dosyam.close();
+       
+        }
+           ///////////////////////////////////////7////////////////////////////////////////////////////////////////
+                                                                                                                                               //log girme yeri alanı
+      dosyam=SD.open("log.txt",FILE_WRITE);
+      dosyam.peek();
+
+
+      myRTC.updateTime();
+
+       dosyam.print(kimlik);dosyam.print(" -- ");                                                                       // id yi yazıyor
+       for(int k=0;k<8;k++){dosyam.print(ad[k]);}dosyam.print(" -- ");dosyam.print(kapi);dosyam.print(" -- ");dosyam.print(durum);dosyam.print(" -- ");                                                 //ad soyad yazıyor
+      dosyam.print("Tarih : ");dosyam.print(myRTC.dayofmonth);dosyam.print("/");dosyam.print(myRTC.month);              //
+      dosyam.print("/");dosyam.print(myRTC.year);dosyam.print(" ");dosyam.print(myRTC.hours);                            //tarihi yazıyoruz
+      dosyam.print(":");dosyam.print(myRTC.minutes);dosyam.print(":");dosyam.println(myRTC.seconds);
+       // 3 saniye gecikme veriyoruz.
+      delay(3000);
+            
+      Serial.print(kimlik);Serial.print("---");for(int k=0;k<8;k++){Serial.print(ad[k]);}Serial.print("---");Serial.print(durum);Serial.print(" -- ");
+
+      
+                                                          // bizim görmemiz için log.txt ye yazılan değerler gösterilir.
+   myRTC.updateTime();
+// Şimdi değerleri okuyalım
+Serial.print("Tarih :");
+Serial.print(myRTC.dayofmonth);
+Serial.print("/");
+Serial.print(myRTC.month);
+Serial.print("/");
+Serial.print(myRTC.year);
+Serial.print(" ");
+Serial.print(myRTC.hours);
+Serial.print(":");
+Serial.print(myRTC.minutes);
+Serial.print(":");
+Serial.println(myRTC.seconds);
+ 
+
+
+
+      Serial.print("log girme işlemi bitti");
+      dosyam.close();
+   delay(2000);
+     // key();
+      return;
+
+
+        
+      }
+      }
+   }
+   if(kontrol=2)
+   {Serial.println("Şifre hatalı");dosyam.close();
+  loop();}
+}
+
+
+
+
+
+
+
+      /////////////////////////////////////////////////////////////////////        
+                      
+                        void yak()
+                        {
+                          digitalWrite(A4,HIGH);
+                               delay(1000);
+                               digitalWrite(A4,LOW);
+                               delay(500);
+                               
+                        }
+  
